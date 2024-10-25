@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./TypingArea.css";
 
 function TypingArea() {
@@ -10,6 +10,8 @@ function TypingArea() {
   const [accuracy, setAccuracy] = useState(0); // 정확도
   const [wpm, setWpm] = useState(0); // WPM (타자 속도)
   const [fileLink, setFileLink] = useState(""); // 파일 출처 링크
+  const timerRef = useRef(null); // useRef로 타이머 변수 선언
+  const [isPaused, setIsPaused] = useState(false); // 일시 정지 상태
 
   // GitHub API에서 lodash 레포지토리의 .js 파일을 가져오는 함수
   const fetchJSFilesFromGithub = async () => {
@@ -33,7 +35,6 @@ function TypingArea() {
 
       const data = await response.json();
       if (data.items.length > 0) {
-        // 크기를 제한하지 않고 가져오기
         const randomItem =
           data.items[Math.floor(Math.random() * data.items.length)];
         fetchCodeSnippet(randomItem); // 랜덤 파일의 코드 스니펫 가져오기
@@ -91,25 +92,28 @@ function TypingArea() {
     }
   };
 
-  // 타이머가 작동하는 부분
+  // useEffect 내에서 타이머 상태 확인
   useEffect(() => {
-    let timerInterval;
+    if (isPaused) {
+      clearInterval(timerRef.current); // 일시 정지 상태일 때 타이머 멈춤
+      return; // 아무 것도 하지 않음
+    }
 
+    // 타이머가 작동 중일 때
     if (startTime && !isFinished) {
-      timerInterval = setInterval(() => {
-        setCurrentTime(((new Date().getTime() - startTime) / 1000).toFixed(2)); // 경과 시간 (초 단위)
+      timerRef.current = setInterval(() => {
+        setCurrentTime((prevTime) => {
+          const updatedTime = (parseFloat(prevTime) || 0) + 0.1; // prevTime이 숫자가 아닐 경우 기본값 0
+          return updatedTime.toFixed(1); // 소수점 한 자리까지 표시
+        });
       }, 100); // 0.1초마다 업데이트
     }
 
-    if (isFinished) {
-      clearInterval(timerInterval); // 타이핑이 끝나면 타이머 멈춤
-    }
+    return () => clearInterval(timerRef.current);
+  }, [startTime, isFinished, isPaused]); // isPaused를 의존성 배열에 추가
 
-    return () => clearInterval(timerInterval);
-  }, [startTime, isFinished]);
-
+  // 타이핑 완료 및 정확도, WPM 계산
   useEffect(() => {
-    // 모든 공백 문자를 단일 공백으로 대체한 후 길이를 비교
     const cleanedUserInput = userInput.replace(/\s+/g, " ").trim();
     const cleanedCodeToType = codeToType.replace(/\s+/g, " ").trim();
 
@@ -120,7 +124,6 @@ function TypingArea() {
       const endTime = new Date().getTime();
       setIsFinished(true);
 
-      // 시간 계산 (분 단위)
       const timeTaken = (endTime - startTime) / 1000 / 60; // 분 단위 시간
       const correctChars = cleanedUserInput
         .split("")
@@ -135,14 +138,22 @@ function TypingArea() {
   }, [userInput, codeToType, startTime]);
 
   const handleInputChange = (e) => {
+    const inputValue = e.target.value;
+    setUserInput(inputValue);
+
     if (!startTime) {
       setStartTime(new Date().getTime()); // 첫 입력 시 타이머 시작
     }
-    setUserInput(e.target.value);
+
+    // 일시 정지 상태 해제
+    setIsPaused(false);
+  };
+
+  const togglePause = () => {
+    setIsPaused((prev) => !prev); // 일시 정지 상태 토글
   };
 
   const renderText = () => {
-    // 비가시적인 공백 문자 제거
     const cleanedInput = userInput.replace(/\s+/g, " "); // 모든 공백 문자를 단일 공백으로 대체
     const cleanedCodeToType = codeToType.replace(/\s+/g, " "); // 모든 공백 문자를 단일 공백으로 대체
 
@@ -177,9 +188,8 @@ function TypingArea() {
     });
   };
 
-  // 컴포넌트가 처음 렌더링될 때 .js 파일을 가져옵니다.
   useEffect(() => {
-    fetchJSFilesFromGithub();
+    fetchJSFilesFromGithub(); // 컴포넌트가 처음 렌더링될 때 .js 파일을 가져옵니다.
   }, []);
 
   return (
@@ -201,32 +211,26 @@ function TypingArea() {
         }}
         autoComplete="off" // 자동 완성 비활성화
         spellCheck="false" // 맞춤법 검사 비활성화
+        disabled={isPaused || isFinished} // 일시 정지 상태일 때 입력 불가
         onKeyDown={(e) => {
           if (e.key === "Tab") {
             e.preventDefault(); // 기본 Tab 동작 방지
             const start = e.target.selectionStart;
             const end = e.target.selectionEnd;
-
-            // Tab 추가
             setUserInput(
               userInput.substring(0, start) + "\t" + userInput.substring(end)
-            );
-            e.target.selectionStart = e.target.selectionEnd = start + 1; // 커서 위치 조정
+            ); // Tab 문자 추가
           }
         }}
       />
-
-      <div className="timer">
-        <h3>타이머: {currentTime}초</h3>
-      </div>
       <div>
-        <p>
-          출처:
-          <a href={fileLink} target="_blank" rel="noopener noreferrer">
-            {fileLink}
-          </a>
-        </p>
+        <p>소요 시간: {currentTime} 초</p>
       </div>
+      {!isFinished && (
+        <button onClick={togglePause}>
+          {isPaused ? "타이머 시작" : "타이머 일시 정지"}
+        </button>
+      )}
 
       {isFinished && (
         <div>
@@ -234,6 +238,14 @@ function TypingArea() {
           <p>정확도: {accuracy}%</p>
           <p>속도: {wpm} WPM</p>
         </div>
+      )}
+
+      {fileLink && (
+        <p>
+          <a href={fileLink} target="_blank" rel="noopener noreferrer">
+            코드 출처
+          </a>
+        </p>
       )}
     </div>
   );
