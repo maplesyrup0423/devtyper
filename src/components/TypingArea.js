@@ -199,6 +199,8 @@ function TypingArea() {
           backgroundColor: "black",
           color: "lightgray",
         }}
+        autoComplete="off" // 자동 완성 비활성화
+        spellCheck="false" // 맞춤법 검사 비활성화
         onKeyDown={(e) => {
           if (e.key === "Tab") {
             e.preventDefault(); // 기본 Tab 동작 방지
