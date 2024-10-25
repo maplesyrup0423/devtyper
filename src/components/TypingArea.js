@@ -9,6 +9,7 @@ function TypingArea() {
   const [isFinished, setIsFinished] = useState(false); // 타이핑 완료 여부
   const [accuracy, setAccuracy] = useState(0); // 정확도
   const [wpm, setWpm] = useState(0); // WPM (타자 속도)
+  const [fileLink, setFileLink] = useState(""); // 파일 출처 링크
 
   // GitHub API에서 lodash 레포지토리의 .js 파일을 가져오는 함수
   const fetchJSFilesFromGithub = async () => {
@@ -74,6 +75,7 @@ function TypingArea() {
             const randomFunction =
               functions[Math.floor(Math.random() * functions.length)];
             setCodeToType(randomFunction); // 선택한 함수 설정
+            setFileLink(item.html_url); // 파일 출처 링크 설정
           } else {
             console.log("파일에 함수가 없습니다. 다시 시도합니다.");
             fetchJSFilesFromGithub(); // 함수가 없으면 다시 파일을 가져옵니다.
@@ -214,6 +216,14 @@ function TypingArea() {
 
       <div className="timer">
         <h3>타이머: {currentTime}초</h3>
+      </div>
+      <div>
+        <p>
+          출처:
+          <a href={fileLink} target="_blank" rel="noopener noreferrer">
+            {fileLink}
+          </a>
+        </p>
       </div>
 
       {isFinished && (
